@@ -91,5 +91,7 @@ if __name__ == "__main__":
     parser.add_argument("--in_dir", type=str, help="Input directory containing all the images (CT and PET, mixed)")
     parser.add_argument("--out_dir", type=str, help="Directory to save the images")
     args = parser.parse_args()
-    
+
+    # print(args.in_dir)
+    # print(sorted(list(filter(lambda s: "PET" in s, os.listdir(args.in_dir)))))
     preprocess_nifti_images(args.in_dir, args.out_dir)

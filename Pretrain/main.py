@@ -1,14 +1,3 @@
-# Copyright 2020 - 2022 MONAI Consortium
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#     http://www.apache.org/licenses/LICENSE-2.0
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import argparse
 import os
 from time import time
@@ -16,13 +5,10 @@ import logging
 
 import numpy as np
 import torch
-import torch.distributed as dist
 import torch.optim as optim
 from losses.loss import Loss
 from models.ssl_head import SSLHead
 from optimizers.lr_scheduler import WarmupCosineSchedule
-from torch.cuda.amp import GradScaler, autocast
-from torch.nn.parallel import DistributedDataParallel
 from torch.utils.tensorboard import SummaryWriter
 from utils.data_utils import get_loader
 from utils.ops import aug_rand, rot_rand
@@ -40,14 +26,14 @@ def main():
 
         for step, batch in enumerate(train_loader):
             t1 = time()
-            x = batch["image"].cuda()
+            x = batch["image"].to(args.device)
             x1, rot1 = rot_rand(args, x)
             x2, rot2 = rot_rand(args, x)
             x1_augment = aug_rand(args, x1)
             x2_augment = aug_rand(args, x2)
             x1_augment = x1_augment
             x2_augment = x2_augment
-            with autocast(enabled=args.amp):
+            with torch.cuda.amp.autocast(enabled=args.amp):
                 rot1_p, contrastive1_p, rec_x1 = model(x1_augment)
                 rot2_p, contrastive2_p, rec_x2 = model(x2_augment)
                 rot_p = torch.cat([rot1_p, rot2_p], dim=0)
@@ -70,17 +56,11 @@ def main():
             if args.lrdecay:
                 scheduler.step()
             optimizer.zero_grad()
-            if args.distributed:
-                if dist.get_rank() == 0:
-                    logger.info("Step:{}/{}, Loss:{:.4f}, Time:{:.4f}".format(global_step, args.num_steps, loss.item(), time() - t1))
-            else:
-                logger.info("Step:{}/{}, Loss:{:.4f}, Time:{:.4f}".format(global_step, args.num_steps, loss.item(), time() - t1))
+            logger.info("Step:{}/{}, Loss:{:.4f}, Time:{:.4f}".format(global_step, args.num_steps, loss.item(), time() - t1))
 
             global_step += 1
-            if args.distributed:
-                val_cond = (dist.get_rank() == 0) and (global_step % args.eval_num == 0)
-            else:
-                val_cond = global_step % args.eval_num == 0
+
+            val_cond = global_step % args.eval_num == 0
 
             if val_cond:
                 val_loss, val_loss_recon, img_list = validation(args, test_loader)
@@ -115,12 +95,12 @@ def main():
         loss_val_recon = []
         with torch.no_grad():
             for step, batch in enumerate(test_loader):
-                val_inputs = batch["image"].cuda()
+                val_inputs = batch["image"].to(args.device)
                 x1, rot1 = rot_rand(args, val_inputs)
                 x2, rot2 = rot_rand(args, val_inputs)
                 x1_augment = aug_rand(args, x1)
                 x2_augment = aug_rand(args, x2)
-                with autocast(enabled=args.amp):
+                with torch.cuda.amp.autocast(enabled=args.amp):
                     rot1_p, contrastive1_p, rec_x1 = model(x1_augment)
                     rot2_p, contrastive2_p, rec_x2 = model(x2_augment)
                     rot_p = torch.cat([rot1_p, rot2_p], dim=0)
@@ -144,7 +124,8 @@ def main():
                 recon = rec_x1[0][0][:, :, 48] * 255.0
                 recon = recon.astype(np.uint8)
                 img_list = [xgt, x_aug, recon]
-                logger.info("Validation step:{}, Loss:{:.4f}, Loss Reconstruction:{:.4f}".format(step, loss.item(), loss_recon.item()))
+                logger.info("Validation step:{}, Loss:{:.4f}, Loss Reconstruction:{:.4f}".format(step, loss.item(),
+                                                                                                 loss_recon.item()))
 
         return np.mean(loss_val), np.mean(loss_val_recon), img_list
 
@@ -202,29 +183,19 @@ def main():
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     args.amp = not args.noamp
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = False
     torch.autograd.set_detect_anomaly(True)
     args.distributed = False
     if "WORLD_SIZE" in os.environ:
         args.distributed = int(os.environ["WORLD_SIZE"]) > 1
     if args.distributed:
         args.local_rank = int(os.environ['LOCAL_RANK'])
-    args.device = "cuda:0"
+    args.device = "cpu"
     args.world_size = 1
     args.rank = 0
 
-    if args.distributed:
-        args.device = "cuda:%d" % args.local_rank
-        torch.cuda.set_device(args.local_rank)
-        torch.distributed.init_process_group(backend="nccl", init_method=args.dist_url)
-        args.world_size = torch.distributed.get_world_size()
-        args.rank = torch.distributed.get_rank()
-        logger.info(
-            "Training in distributed mode with multiple processes, 1 GPU per process. Process %d, total %d."
-            % (args.rank, args.world_size)
-        )
-    else:
-        logger.info("Training with a single process on 1 GPUs.")
+    logger.info("Training with a single process on CPU.")
+
     assert args.rank >= 0
 
     if args.rank == 0:
@@ -235,7 +206,7 @@ def main():
     model = SSLHead(args)
     if args.resume_ssl:
         try:
-            model_dict = torch.load(args.pretrained_path)
+            model_dict = torch.load(args.pretrained_path, map_location=args.device)
             state_dict = model_dict["state_dict"]
             # fix potential differences in state dict keys from pre-training to
             # fine-tuning
@@ -254,7 +225,8 @@ def main():
             logger.info("Using pretrained self-supervised Swin UNETR backbone weights !")
         except ValueError:
             raise ValueError("Self-supervised pre-trained weights not available for" + str(args.model_name))
-    model.cuda()
+
+    model.to(args.device)
 
     if args.opt == "adam":
         optimizer = optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.decay)
@@ -267,7 +239,7 @@ def main():
 
     if args.resume:
         model_pth = args.resume
-        model_dict = torch.load(model_pth)
+        model_dict = torch.load(model_pth, map_location=args.device)
         model.load_state_dict(model_dict["state_dict"])
         model.epoch = model_dict["epoch"]
         model.optimizer = model_dict["optimizer"]
@@ -284,27 +256,19 @@ def main():
             scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambdas)
 
     loss_function = Loss(args.batch_size * args.sw_batch_size, args)
-    if args.distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = DistributedDataParallel(model, device_ids=[args.local_rank])
     train_loader, test_loader = get_loader(args)
 
     global_step = 0
     best_val = 1e8
     if args.amp:
-        scaler = GradScaler()
+        scaler = torch.cuda.amp.GradScaler()
     else:
         scaler = None
     while global_step < args.num_steps:
         global_step, loss, best_val = train(args, global_step, train_loader, best_val, scaler)
     checkpoint = {"epoch": args.epochs, "state_dict": model.state_dict(), "optimizer": optimizer.state_dict()}
 
-    if args.distributed:
-        if dist.get_rank() == 0:
-            torch.save(model.state_dict(), os.path.join(logdir, f"{args.exp}_final_model.pth"))
-        dist.destroy_process_group()
-    else:
-        torch.save(model.state_dict(), os.path.join(logdir, f"{args.exp}_final_model.pth"))
+    torch.save(model.state_dict(), os.path.join(logdir, f"{args.exp}_final_model.pth"))
     save_ckp(checkpoint, os.path.join(logdir, f"{args.exp}_final_epoch.pth"))
 
 

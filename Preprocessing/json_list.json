@@ -1,0 +1,1 @@
+{"training": [{"image": ["./CT/CT6.nii.gz", "./PET/PET6.nii.gz"]}, {"image": ["./CT/CT3.nii.gz", "./PET/PET3.nii.gz"]}, {"image": ["./CT/CT4.nii.gz", "./PET/PET4.nii.gz"]}, {"image": ["./CT/CT7.nii.gz", "./PET/PET7.nii.gz"]}, {"image": ["./CT/CT1.nii.gz", "./PET/PET1.nii.gz"]}, {"image": ["./CT/CT8.nii.gz", "./PET/PET8.nii.gz"]}], "validation": []}
