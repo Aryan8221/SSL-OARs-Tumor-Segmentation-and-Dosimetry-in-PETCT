@@ -19,6 +19,7 @@ from monai import data, transforms
 from monai.data import load_decathlon_datalist
 from monai.transforms import RandSpatialCropd
 
+
 class Sampler(torch.utils.data.Sampler):
     def __init__(self, dataset, num_replicas=None, rank=None, shuffle=True, make_even=True):
         if num_replicas is None:

@@ -178,7 +178,7 @@ def main():
     os.makedirs(logdir, exist_ok=True)
     logger = logging.getLogger('logger')
     logger.setLevel(logging.INFO)
-    file_handler = logging.FileHandler(os.path.join(logdir, 'logFile.log'))
+    file_handler = logging.FileHandler(os.path.join(logdir, 'logFile1111.log'))
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Load the NIfTI file
-nii_file_path = 'Preprocessing/data/CT/CT766.nii.gz'
+nii_file_path = '/Users/aryanneizehbaz/Aryan8221/coding_projects/SSL-OARs-Tumor-Segmentation-in-PETCT/Dosimetry_Finetune/data_pre_processed/PET/PET11.nii'
 nii_img = nib.load(nii_file_path)
 
 # Get the data from the NIfTI file

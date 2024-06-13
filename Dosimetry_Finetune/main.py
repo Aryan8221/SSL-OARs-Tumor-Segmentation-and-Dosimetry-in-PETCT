@@ -87,10 +87,12 @@ parser.add_argument("--smooth_dr", default=1e-6, type=float, help="constant adde
 parser.add_argument("--smooth_nr", default=0.0, type=float, help="constant added to dice numerator to avoid zero")
 parser.add_argument("--use_checkpoint", action="store_true", help="use gradient checkpointing to save memory")
 parser.add_argument("--use_ssl_pretrained", action="store_true", help="use self-supervised pretrained weights")
-parser.add_argument("--ssl_pretrained_path", default="./pretrained_models/model_swinvit.pt", type=str, help="path to the visual representation")
+parser.add_argument("--ssl_pretrained_path", default="./pretrained_models/model_swinvit.pt", type=str,
+                    help="path to the visual representation")
 parser.add_argument("--spatial_dims", default=3, type=int, help="spatial dimension of input data")
 parser.add_argument("--squared_dice", action="store_true", help="use squared Dice")
 parser.add_argument("--gpu", default=0, type=int, help="gpu ID")
+
 
 def main():
     args = parser.parse_args()
@@ -110,7 +112,6 @@ def main():
 
 
 def main_worker(gpu, args, logger):
-
     if args.distributed:
         torch.multiprocessing.set_start_method("fork", force=True)
     np.set_printoptions(formatter={"float": "{: 0.3f}".format}, suppress=True)
@@ -232,7 +233,7 @@ def main_worker(gpu, args, logger):
         model_inferer=model_inferer,
         scheduler=scheduler,
         start_epoch=start_epoch,
-	logger=logger
+        logger=logger
     )
     return accuracy
 

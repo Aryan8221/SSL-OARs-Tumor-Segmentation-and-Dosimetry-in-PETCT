@@ -1,1 +1,104 @@
-{"training": [{"image": ["./CT/CT24.nii.gz", "PET/PET24.nii.gz"], "label": "./Mask/DML24.nii.gz"}, {"image": ["./CT/CT8.nii.gz", "./PET/PET8.nii.gz"], "label": "./Mask/DML8.nii.gz"}, {"image": ["./CT/CT42.nii.gz", "./PET/PET42.nii.gz"], "label": "./Mask/DML42.nii.gz"}, {"image": ["./CT/CT15.nii.gz", "./PET/PET15.nii.gz"], "label": "./Mask/DML15.nii.gz"}, {"image": ["./CT/CT12.nii.gz", "./PET/PET12.nii.gz"], "label": "./Mask/DML12.nii.gz"}, {"image": ["./CT/CT36.nii.gz", "./PET/PET36.nii.gz"], "label": "./Mask/DML36.nii.gz"}, {"image": ["./CT/CT13.nii.gz", "./PET/PET13.nii.gz"], "label": "./Mask/DML13.nii.gz"}, {"image": ["./CT/CT14.nii.gz", "./PET/PET14.nii.gz"], "label": "./Mask/DML14.nii.gz"}, {"image": ["./CT/CT10.nii.gz", "./PET/PET10.nii.gz"], "label": "./Mask/DML10.nii.gz"}, {"image": ["./CT/CT11.nii.gz", "./PET/PET11.nii.gz"], "label": "./Mask/DML11.nii.gz"}, {"image": ["./CT/CT41.nii.gz", "./PET/PET41.nii.gz"], "label": "./Mask/DML41.nii.gz"}], "validation": [{"image": ["./CT/CT35.nii.gz", "./PET/PET35.nii.gz"], "label": "./Mask/DML35.nii.gz"}, {"image": ["./CT/CT7.nii.gz", "./PET/PET7.nii.gz"], "label": "./Mask/DML7.nii.gz"}, {"image": ["./CT/CT31.nii.gz", "./PET/PET31.nii.gz"], "label": "./Mask/DML31.nii.gz"}]}
+{
+  "training": [
+    {
+      "image": [
+        "./CT/CT24.nii.gz",
+        "PET/PET24.nii.gz"
+      ],
+      "label": "./Mask/DML24.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT8.nii.gz",
+        "./PET/PET8.nii.gz"
+      ],
+      "label": "./Mask/DML8.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT42.nii.gz",
+        "./PET/PET42.nii.gz"
+      ],
+      "label": "./Mask/DML42.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT15.nii.gz",
+        "./PET/PET15.nii.gz"
+      ],
+      "label": "./Mask/DML15.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT12.nii.gz",
+        "./PET/PET12.nii.gz"
+      ],
+      "label": "./Mask/DML12.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT36.nii.gz",
+        "./PET/PET36.nii.gz"
+      ],
+      "label": "./Mask/DML36.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT13.nii.gz",
+        "./PET/PET13.nii.gz"
+      ],
+      "label": "./Mask/DML13.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT14.nii.gz",
+        "./PET/PET14.nii.gz"
+      ],
+      "label": "./Mask/DML14.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT10.nii.gz",
+        "./PET/PET10.nii.gz"
+      ],
+      "label": "./Mask/DML10.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT11.nii.gz",
+        "./PET/PET11.nii.gz"
+      ],
+      "label": "./Mask/DML11.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT41.nii.gz",
+        "./PET/PET41.nii.gz"
+      ],
+      "label": "./Mask/DML41.nii.gz"
+    }
+  ],
+  "validation": [
+    {
+      "image": [
+        "./CT/CT35.nii.gz",
+        "./PET/PET35.nii.gz"
+      ],
+      "label": "./Mask/DML35.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT7.nii.gz",
+        "./PET/PET7.nii.gz"
+      ],
+      "label": "./Mask/DML7.nii.gz"
+    },
+    {
+      "image": [
+        "./CT/CT31.nii.gz",
+        "./PET/PET31.nii.gz"
+      ],
+      "label": "./Mask/DML31.nii.gz"
+    }
+  ]
+}

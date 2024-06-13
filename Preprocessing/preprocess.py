@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from tqdm import tqdm
 
+
 def resample_image(image, new_spacing, reference_image):
     """Resamples an image to a new spacing, using the reference image to determine the size of the output image.
 
@@ -34,6 +35,7 @@ def resample_image(image, new_spacing, reference_image):
     resampled_array = sitk.GetArrayFromImage(resampled_image)
 
     return np.transpose(resampled_array, (2, 1, 0))
+
 
 def preprocess_nifti_images(in_dir, out_dir):
     os.makedirs(out_dir, exist_ok=True)
@@ -85,6 +87,7 @@ def preprocess_nifti_images(in_dir, out_dir):
 
             nib.save(final_ct_image, ct_output_path)
             nib.save(final_pet_image, pet_output_path)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Preprocess Nifti Images")

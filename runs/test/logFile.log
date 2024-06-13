@@ -1,5 +1,0 @@
-2024-05-20 20:42:08,570 - logger - INFO - Training with a single process on 1 GPUs.
-2024-05-20 21:29:43,544 - logger - INFO - Training with a single process on 1 GPUs.
-2024-05-20 21:32:25,728 - logger - INFO - Training with a single process on CPU.
-2024-05-20 21:33:08,540 - logger - INFO - Training with a single process on CPU.
-2024-05-20 21:35:38,198 - logger - INFO - Step:0/250000, Loss:3.5391, Time:143.5281

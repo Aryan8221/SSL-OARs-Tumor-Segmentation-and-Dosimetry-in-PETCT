@@ -113,9 +113,11 @@ def main():
             print("Inference on case {}".format(img_name))
             val_outputs = sliding_window_inference(
                 val_inputs, (args.roi_x, args.roi_y, args.roi_z), 4, model, overlap=args.infer_overlap, mode="gaussian"
-            )
-            val_outputs = torch.softmax(val_outputs, 1).cpu().numpy()
-            val_outputs = np.argmax(val_outputs, axis=1).astype(np.uint8)[0]
+            )  # calculating the score of class (each voxel in roi_x * roi_y * roi_z has args.out_channels scores)
+            # --> (12, roi_x, roi_y, roi_z)
+            val_outputs = torch.softmax(val_outputs, 1).cpu().numpy()  # calculating the probabilities of the scores
+            # from above in each voxel
+            val_outputs = np.argmax(val_outputs, axis=1).astype(np.uint8)[0]  # selecting the argmax of above probabilities
             val_labels = val_labels.cpu().numpy()[0, 0, :, :, :]
             val_outputs = resample_3d(val_outputs, target_shape)
             dice_list_sub = []
