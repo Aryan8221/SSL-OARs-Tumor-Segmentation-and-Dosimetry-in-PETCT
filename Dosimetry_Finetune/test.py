@@ -12,6 +12,7 @@
 import argparse
 import os
 
+from math import *
 import nibabel as nib
 import numpy as np
 import torch
@@ -64,7 +65,7 @@ parser.add_argument("--save", action="store_true", help="save dose map output")
 def main():
     args = parser.parse_args()
     args.test_mode = True
-    output_directory = "./outputs/" + args.exp_name
+    output_directory = "./predictions/" + args.exp_name
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
     val_loader = get_loader(args)
@@ -82,7 +83,7 @@ def main():
         use_checkpoint=args.use_checkpoint,
     )
 
-    model_dict = torch.load(pretrained_pth)["state_dict"]
+    model_dict = torch.load(pretrained_pth, map_location=device)["state_dict"]
 
     # Print the keys to help debug
     print("Model state_dict keys:")
@@ -120,7 +121,8 @@ def main():
                 nib.save(
                     nib.Nifti1Image(val_outputs.astype(np.float32), original_affine), os.path.join(output_directory, img_name)
                 )
-        print("Overall Mean MSE: {}".format(np.mean(mse_list_case)))
+        print("Overall Mean RMSE: {}".format(sqrt(np.mean(mse_list_case))))
+
 
 if __name__ == "__main__":
     args = parser.parse_args()

@@ -16,27 +16,23 @@ from utils.utils import AverageMeter, distributed_all_gather
 from sklearn.metrics import mean_absolute_error, r2_score
 
 
-def symmetric_mean_absolute_percentage_error(y_true, y_pred):
-    y_true = y_true.flatten()
-    y_pred = y_pred.flatten()
+def calculate_mape_ignore_zeros(y_true, y_pred):
 
     mask = y_true != 0
-    y_true = y_true[mask]
-    y_pred = y_pred[mask]
 
-    numerator = np.abs(y_true - y_pred)
-    denominator = np.abs(y_true) + np.abs(y_pred)
+    y_true_filtered = y_true[mask]
+    y_pred_filtered = y_pred[mask]
 
-    smape = np.mean(2.0 * numerator / denominator) * 100
+    mape = np.mean(np.abs((y_true_filtered - y_pred_filtered) / y_true_filtered)) * 100
 
-    return smape
+    return mape
 
 
 def train_epoch(model, loader, optimizer, scaler, epoch, loss_func, args, logger):
     model.train()
     start_time = time.time()
     run_loss = AverageMeter()
-    run_smape = AverageMeter()
+    run_mape = AverageMeter()
     run_mae = AverageMeter()
     run_r2 = AverageMeter()
     device = torch.device(f'cuda:{args.gpu}')
@@ -67,23 +63,23 @@ def train_epoch(model, loader, optimizer, scaler, epoch, loss_func, args, logger
         target_np = target.detach().cpu().numpy()
 
         for logit, tgt in zip(logits_np, target_np):
-            run_smape.update(symmetric_mean_absolute_percentage_error(tgt.flatten(), logit.flatten()))
+            run_mape.update(calculate_mape_ignore_zeros(tgt.flatten(), logit.flatten()))
             run_mae.update(mean_absolute_error(tgt.flatten(), logit.flatten()))
             run_r2.update(r2_score(tgt.flatten(), logit.flatten()))
 
         if args.rank == 0:
             logger.info(
-                f"Epoch {epoch + 1}/{args.max_epochs} {idx + 1}/{len(loader)}\tRMSE: {run_loss.avg:.4f}\tsMAPE: {run_smape.avg:.4f}\tMAE: {run_mae.avg:.4f}\tR2: {run_r2.avg:.4f}\ttime {time.time() - start_time:.2f}s"
+                f"Epoch {epoch + 1}/{args.max_epochs} {idx + 1}/{len(loader)}\tRMSE: {np.sqrt(run_loss.avg):.4f}\tMAPE: {run_mape.avg:.4f}\tMAE: {run_mae.avg:.4f}\tR2: {run_r2.avg:.4f}\ttime {time.time() - start_time:.2f}s"
             )
         start_time = time.time()
 
-    return run_loss.avg, run_smape.avg, run_mae.avg, run_r2.avg
+    return np.sqrt(run_loss.avg), run_mape.avg, run_mae.avg, run_r2.avg
 
 
 def val_epoch(model, loader, epoch, args, logger, model_inferer=None):
     model.eval()
     run_rmse = AverageMeter()
-    run_smape = AverageMeter()
+    run_mape = AverageMeter()
     run_mae = AverageMeter()
     run_r2 = AverageMeter()
     start_time = time.time()
@@ -115,18 +111,18 @@ def val_epoch(model, loader, epoch, args, logger, model_inferer=None):
                 run_rmse.update(rmse, n=1)
 
             for logit, tgt in zip(logits_np, target_np):
-                run_smape.update(symmetric_mean_absolute_percentage_error(tgt.flatten(), logit.flatten()))
+                run_mape.update(calculate_mape_ignore_zeros(tgt.flatten(), logit.flatten()))
                 run_mae.update(mean_absolute_error(tgt.flatten(), logit.flatten()))
                 run_r2.update(r2_score(tgt.flatten(), logit.flatten()))
 
             if args.rank == 0:
                 avg_rmse = np.mean(run_rmse.avg)
                 logger.info(
-                    f"Val {epoch}/{args.max_epochs} {idx}/{len(loader)}\tRMSE: {avg_rmse:.4f}\tsMAPE: {run_smape.avg:.4f}\tMAE: {run_mae.avg:.4f}\tR2: {run_r2.avg:.4f}\ttime {time.time() - start_time:.2f}s"
+                    f"Val {epoch + 1}/{args.max_epochs} {idx + 1}/{len(loader)}\tRMSE: {avg_rmse:.4f}\tMAPE: {run_mape.avg:.4f}\tMAE: {run_mae.avg:.4f}\tR2: {run_r2.avg:.4f}\ttime {time.time() - start_time:.2f}s"
                 )
             start_time = time.time()
 
-    return run_rmse.avg, run_smape.avg, run_mae.avg, run_r2.avg
+    return run_rmse.avg, run_mape.avg, run_mae.avg, run_r2.avg
 
 
 def save_checkpoint(model, epoch, args, logger, filename="model.pt", best_rmse=0, optimizer=None, scheduler=None):
@@ -168,16 +164,16 @@ def run_training(
             torch.distributed.barrier()
         logger.info(f'{args.rank}\t{time.ctime()}\tEpoch: {epoch}')
         epoch_time = time.time()
-        train_rmse, train_smape, train_mae, train_r2 = train_epoch(
+        train_rmse, train_mape, train_mae, train_r2 = train_epoch(
             model, train_loader, optimizer, scaler=scaler, epoch=epoch, loss_func=loss_func, args=args, logger=logger
         )
         if args.rank == 0:
             logger.info(
-                f"Final training  {epoch + 1}/{args.max_epochs}\tLoss: {train_rmse:.4f}\tsMAPE: {train_smape:.4f}\tMAE: {train_mae:.4f}\tR2: {train_r2:.4f}\ttime {time.time() - epoch_time:.2f}s"
+                f"Final training  {epoch + 1}/{args.max_epochs}\tRMSE: {train_rmse:.4f}\tMAPE: {train_mape:.4f}\tMAE: {train_mae:.4f}\tR2: {train_r2:.4f}\ttime {time.time() - epoch_time:.2f}s"
             )
         if args.rank == 0 and writer is not None:
             writer.add_scalar("train_rmse", train_rmse, epoch)
-            writer.add_scalar("train_smape", train_smape, epoch)
+            writer.add_scalar("train_mape", train_mape, epoch)
             writer.add_scalar("train_mae", train_mae, epoch)
             writer.add_scalar("train_r2", train_r2, epoch)
         b_new_best = False
@@ -185,7 +181,7 @@ def run_training(
             if args.distributed:
                 torch.distributed.barrier()
             epoch_time = time.time()
-            val_avg_rmse, val_smape, val_mae, val_r2 = val_epoch(
+            val_avg_rmse, val_mape, val_mae, val_r2 = val_epoch(
                 model,
                 val_loader,
                 epoch=epoch,
@@ -198,11 +194,11 @@ def run_training(
 
             if args.rank == 0:
                 logger.info(
-                    f"Final validation  {epoch + 1}/{args.max_epochs}\tRMSE: {val_avg_rmse:.4f}\tsMAPE: {val_smape:.4f}\tMAE: {val_mae:.4f}\tR2: {val_r2:.4f}\ttime {time.time() - epoch_time:.2f}s"
+                    f"Final validation  {epoch + 1}/{args.max_epochs}\tRMSE: {val_avg_rmse:.4f}\tMAPE: {val_mape:.4f}\tMAE: {val_mae:.4f}\tR2: {val_r2:.4f}\ttime {time.time() - epoch_time:.2f}s"
                 )
                 if writer is not None:
                     writer.add_scalar("val_rmse", val_avg_rmse, epoch)
-                    writer.add_scalar("val_smape", val_smape, epoch)
+                    writer.add_scalar("val_mape", val_mape, epoch)
                     writer.add_scalar("val_mae", val_mae, epoch)
                     writer.add_scalar("val_r2", val_r2, epoch)
                 if val_avg_rmse < best_val_rmse:  # For RMSE, lower is better
