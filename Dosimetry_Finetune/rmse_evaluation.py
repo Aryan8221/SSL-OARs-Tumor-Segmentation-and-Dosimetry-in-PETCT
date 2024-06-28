@@ -11,7 +11,6 @@ categories = {
     'pet-ct-ssl': []
 }
 
-# Process each log file
 for log_file in os.listdir(log_dir):
     file_path = os.path.join(log_dir, log_file)
     if os.path.isfile(file_path):
@@ -48,7 +47,6 @@ categories = {
     'pet-ct-ssl': {}
 }
 
-# Process each log file
 for log_file in os.listdir(log_dir):
     file_path = os.path.join(log_dir, log_file)
     if os.path.isfile(file_path):
