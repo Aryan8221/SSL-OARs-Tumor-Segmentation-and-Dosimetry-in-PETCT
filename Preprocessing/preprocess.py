@@ -43,14 +43,14 @@ def preprocess_nifti_images(in_dir, out_dir):
     os.makedirs(os.path.join(out_dir, "CT"), exist_ok=True)
 
     all_files = os.listdir(in_dir)
-    pet_files = sorted(list(filter(lambda s: "PET" in s, all_files)))
+    pet_files = sorted(list(filter(lambda s: "PT" in s, all_files)))
     ct_files = sorted(list(filter(lambda s: "CT" in s, all_files)))
 
     assert len(ct_files) == len(pet_files)
 
     for ct_filename, pet_filename in tqdm(zip(ct_files, pet_files)):
-        assert ct_filename.replace("CT", "") == pet_filename.replace("PET", "")
-
+        assert ct_filename.replace("CT", "") == pet_filename.replace("PT", "")
+        print("CT", ct_files)
         ct_path = os.path.join(in_dir, ct_filename)
         pet_path = os.path.join(in_dir, pet_filename)
 
@@ -66,13 +66,13 @@ def preprocess_nifti_images(in_dir, out_dir):
         )
 
         ct_hu_min, ct_hu_max = -200, 1000
-        pet_hu_min, pet_hu_max = 0, 100
+        # pet_hu_min, pet_hu_max = 0, 100
 
         clipped_ct_data = np.clip(ct_downsampled_image, ct_hu_min, ct_hu_max)
-        clipped_pet_data = np.clip(pet_nib.get_fdata(), pet_hu_min, pet_hu_max)
+        # clipped_pet_data = np.clip(pet_nib.get_fdata(), pet_hu_min, pet_hu_max)
 
         ct_data_norm = (clipped_ct_data - np.min(clipped_ct_data)) / (np.max(clipped_ct_data) - np.min(clipped_ct_data))
-        pet_data_norm = (clipped_pet_data - np.min(clipped_pet_data)) / (np.max(clipped_pet_data) - np.min(clipped_pet_data))
+        pet_data_norm = (pet_nib.get_fdata() - np.min(pet_nib.get_fdata())) / (np.max(pet_nib.get_fdata()) - np.min(pet_nib.get_fdata()))
 
         final_ct_image = nib.Nifti1Image(
             ct_data_norm, pet_nib.affine, pet_nib.header

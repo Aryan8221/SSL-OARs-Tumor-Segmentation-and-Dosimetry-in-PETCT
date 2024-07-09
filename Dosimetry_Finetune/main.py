@@ -106,7 +106,7 @@ def main():
         args.ngpus_per_node = torch.cuda.device_count()
         logger.info(f"Found total gpus {args.ngpus_per_node}")
         args.world_size = args.ngpus_per_node * args.world_size
-        mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args,))
+        mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, logger))
     else:
         main_worker(gpu=args.gpu, args=args, logger=logger)
 
@@ -161,11 +161,25 @@ def main_worker(gpu, args, logger):
                 logger.info("Tag 'swin_vit' found in state dict - fixing!")
                 for key in list(state_dict.keys()):
                     state_dict[key.replace("swin_vit", "swinViT")] = state_dict.pop(key)
+
+            # Load the model weights
+            model_state_dict = model.state_dict()
+            common_weights = {k: v for k, v in state_dict.items() if k in model_state_dict}
+
+            # Print common weights
+            logger.info("Common weights:")
+            for k in common_weights.keys():
+                logger.info(f"Loaded weight for layer: {k}")
+
             # We now load model weights, setting param `strict` to False, i.e.:
             # this load the encoder weights (Swin-ViT, SSL pre-trained), but leaves
             # the decoder weights untouched (CNN UNet decoder).
-            model.load_state_dict(state_dict, strict=False)
+            missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
             logger.info(f"Using pretrained self-supervised Swin UNETR backbone weights: {args.ssl_pretrained_path}")
+            if missing_keys:
+                logger.warning(f"Missing keys when loading pretrained weights: {missing_keys}")
+            if unexpected_keys:
+                logger.warning(f"Unexpected keys when loading pretrained weights: {unexpected_keys}")
         except ValueError:
             raise ValueError("Self-supervised pre-trained weights not available for" + str(args.model_name))
 

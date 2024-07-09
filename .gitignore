@@ -1,3 +1,5 @@
 Preprocessing/data
 Finetune/masked_data
 Dosimetry_Finetune/data
+Dosimetry_Finetune/aspect_data
+Dosimetry_Finetune/predictions

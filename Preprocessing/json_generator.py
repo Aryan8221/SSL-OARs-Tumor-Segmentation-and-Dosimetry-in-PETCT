@@ -4,12 +4,15 @@ import random
 import json
 import numpy as np
 
+
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
 
+
 def load_files_in_directory(directory):
     return sorted(os.listdir(directory))
+
 
 def generate_ssl_json(args):
     set_seed(42)
@@ -48,6 +51,7 @@ def generate_ssl_json(args):
 
     with open(args.json, "w") as f:
         json.dump(data, f)
+
 
 def generate_supervised_json(args):
     set_seed(42)
@@ -101,6 +105,7 @@ def generate_supervised_json(args):
 
         with open(f"fold{i}.json", "w") as f:
             json.dump(data, f)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate JSON for a dataset")

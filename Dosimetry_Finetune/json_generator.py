@@ -86,7 +86,7 @@ def generate_supervised_json(args):
         validation = []
 
         for ct, pet, mask in zip(ct_files_train, pet_files_train, mask_files_train):
-            if not (ct.replace("CT", "") == pet.replace("PET", "") == mask.replace("DML", "")):
+            if not (ct.replace("CT", "") == pet.replace("PET", "") == mask.replace("ADRM", "")):
                 print(f"not aligned:\tct:{ct}\tpet:{pet}\tmask:{mask}")
 
             training.append({
@@ -95,7 +95,7 @@ def generate_supervised_json(args):
             })
 
         for ct, pet, mask in zip(ct_files_val, pet_files_val, mask_files_val):
-            assert ct.replace("CT", "") == pet.replace("PET", "") == mask.replace("DML", "")
+            assert ct.replace("CT", "") == pet.replace("PET", "") == mask.replace("ADRM", "")
             validation.append({
                 "image": [f"./CT/{ct}", f"./PET/{pet}"],
                 "label": f"./Mask/{mask}"
@@ -126,10 +126,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    args.path = "data"
+    args.path = "aspect_data"
     args.mode = 'sl'
-    args.ratio = 0.1
-    args.folds = 14
+    args.ratio = 0.05
+    args.folds = 20
     args.json = "LOOCV-folds"
 
     if args.mode == "ssl":

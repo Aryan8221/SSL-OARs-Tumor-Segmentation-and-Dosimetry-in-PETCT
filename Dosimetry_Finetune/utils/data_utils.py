@@ -76,7 +76,16 @@ def get_loader(args):
             transforms.EnsureChannelFirstd(keys=["image", "label"]),
             transforms.Orientationd(keys=["image", "label"], axcodes="RAS"),
             transforms.CropForegroundd(keys=["image", "label"], source_key="image"),
-            RandSpatialCropd(keys=["image", "label"], roi_size=(args.roi_x, args.roi_y, args.roi_z), random_size=False),
+            transforms.RandCropByPosNegLabeld(
+                keys=["image", "label"],
+                label_key="label",
+                spatial_size=(args.roi_x, args.roi_y, args.roi_z),
+                pos=1,
+                neg=1,
+                num_samples=4,
+                image_key="image",
+                image_threshold=0,
+            ),
             transforms.RandFlipd(keys=["image", "label"], prob=args.RandFlipd_prob, spatial_axis=0),
             transforms.RandFlipd(keys=["image", "label"], prob=args.RandFlipd_prob, spatial_axis=1),
             transforms.RandFlipd(keys=["image", "label"], prob=args.RandFlipd_prob, spatial_axis=2),
@@ -98,7 +107,7 @@ def get_loader(args):
 
     test_transform = transforms.Compose(
         [
-            transforms.LoadImaged(keys=["image", "label"],image_only=True),
+            transforms.LoadImaged(keys=["image", "label"],image_only=False),
             transforms.EnsureChannelFirstd(keys=["image", "label"]),
             # transforms.Orientationd(keys=["image"], axcodes="RAS"),
             transforms.ToTensord(keys=["image", "label"]),

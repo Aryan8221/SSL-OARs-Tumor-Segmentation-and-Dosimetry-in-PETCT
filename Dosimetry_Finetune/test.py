@@ -1,130 +1,123 @@
-# Copyright 2020 - 2022 MONAI Consortium
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#     http://www.apache.org/licenses/LICENSE-2.0
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-import argparse
 import os
-
-from math import *
-import nibabel as nib
-import numpy as np
 import torch
-from utils.data_utils import get_loader
-from utils.utils import resample_3d
-import pandas as pd
-
+import numpy as np
+import nibabel as nib
+from monai.transforms import (
+    LoadImaged,
+    EnsureChannelFirstd,
+    ToTensord,
+    Compose,
+)
+from monai.data import Dataset, DataLoader, load_decathlon_datalist
 from monai.inferers import sliding_window_inference
 from monai.networks.nets import SwinUNETR
-
-parser = argparse.ArgumentParser(description="Swin UNETR dosimetry pipeline")
-parser.add_argument(
-    "--pretrained_dir", default="./pretrained_models/", type=str, help="pretrained checkpoint directory"
-)
-parser.add_argument("--data_dir", default="/dataset/dataset0/", type=str, help="dataset directory")
-parser.add_argument("--exp_name", default="test1", type=str, help="experiment name")
-parser.add_argument("--json_list", default="dataset_0.json", type=str, help="dataset json file")
-parser.add_argument(
-    "--pretrained_model_name",
-    default="swin_unetr.base_5000ep_f48_lr2e-4_pretrained.pt",
-    type=str,
-    help="pretrained model name",
-)
-parser.add_argument("--feature_size", default=48, type=int, help="feature size")
-parser.add_argument("--infer_overlap", default=0.5, type=float, help="sliding window inference overlap")
-parser.add_argument("--in_channels", default=2, type=int, help="number of input channels")
-parser.add_argument("--out_channels", default=1, type=int, help="number of output channels")  # Changed to 1 for dose map
-parser.add_argument("--a_min", default=-175.0, type=float, help="a_min in ScaleIntensityRanged")
-parser.add_argument("--a_max", default=250.0, type=float, help="a_max in ScaleIntensityRanged")
-parser.add_argument("--b_min", default=0.0, type=float, help="b_min in ScaleIntensityRanged")
-parser.add_argument("--b_max", default=1.0, type=float, help="b_max in ScaleIntensityRanged")
-parser.add_argument("--space_x", default=1.5, type=float, help="spacing in x direction")
-parser.add_argument("--space_y", default=1.5, type=float, help="spacing in y direction")
-parser.add_argument("--space_z", default=2.0, type=float, help="spacing in z direction")
-parser.add_argument("--roi_x", default=96, type=int, help="roi size in x direction")
-parser.add_argument("--roi_y", default=96, type=int, help="roi size in y direction")
-parser.add_argument("--roi_z", default=96, type=int, help="roi size in z direction")
-parser.add_argument("--dropout_rate", default=0.0, type=float, help="dropout rate")
-parser.add_argument("--distributed", action="store_true", help="start distributed training")
-parser.add_argument("--workers", default=4, type=int, help="number of workers")
-parser.add_argument("--RandFlipd_prob", default=0.2, type=float, help="RandFlipd aug probability")
-parser.add_argument("--RandRotate90d_prob", default=0.2, type=float, help="RandRotate90d aug probability")
-parser.add_argument("--RandScaleIntensityd_prob", default=0.1, type=float, help="RandScaleIntensityd aug probability")
-parser.add_argument("--RandShiftIntensityd_prob", default=0.1, type=float, help="RandShiftIntensityd aug probability")
-parser.add_argument("--spatial_dims", default=3, type=int, help="spatial dimension of input data")
-parser.add_argument("--use_checkpoint", action="store_true", help="use gradient checkpointing to save memory")
-parser.add_argument("--save", action="store_true", help="save dose map output")
+import argparse
+import re
 
 
-def main():
-    args = parser.parse_args()
-    args.test_mode = True
-    output_directory = "./predictions/" + args.exp_name
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-    val_loader = get_loader(args)
-    pretrained_dir = args.pretrained_dir
-    model_name = args.pretrained_model_name
-    device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
-    pretrained_pth = os.path.join(pretrained_dir, model_name)
+def load_model(checkpoint_path, device, args):
     model = SwinUNETR(
-        img_size=96,
+        img_size=(args.roi_x, args.roi_y, args.roi_z),
         in_channels=args.in_channels,
         out_channels=args.out_channels,
         feature_size=args.feature_size,
         drop_rate=0.0,
         attn_drop_rate=0.0,
+        dropout_path_rate=args.dropout_path_rate,
         use_checkpoint=args.use_checkpoint,
-    )
+    ).double()
 
-    model_dict = torch.load(pretrained_pth, map_location=device)["state_dict"]
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    state_dict = checkpoint["state_dict"]
 
-    # Print the keys to help debug
-    print("Model state_dict keys:")
-    print(model.state_dict().keys())
-    print("\nLoaded state_dict keys:")
-    print(model_dict.keys())
+    # If the model was trained with DataParallel, it will have 'module.' prefixes in keys
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        if k.startswith("module."):
+            new_state_dict[k[7:]] = v.double()  # Remove 'module.' prefix and convert to double
+        else:
+            new_state_dict[k] = v.double()
 
-    # Filter the state_dict to only contain matching keys
-    model_state_dict = model.state_dict()
-    filtered_dict = {k: v for k, v in model_dict.items() if k in model_state_dict}
-    model_state_dict.update(filtered_dict)
-    model.load_state_dict(model_state_dict)
-
-    model.eval()
+    model.load_state_dict(new_state_dict)
     model.to(device)
+    model.eval()
+    return model
+
+
+def prepare_data(data_dir, json_list, roi_size):
+    datalist_json = os.path.join(data_dir, json_list)
+    val_files = load_decathlon_datalist(datalist_json, True, "validation", base_dir=data_dir)
+    val_transform = Compose(
+        [
+            LoadImaged(keys=["image", "label"], image_only=True),
+            EnsureChannelFirstd(keys=["image", "label"]),
+            ToTensord(keys=["image", "label"], dtype=torch.double),  # Convert to double precision
+        ]
+    )
+    val_ds = Dataset(data=val_files, transform=val_transform)
+    val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=4)
+    return val_loader
+
+
+def save_nifti(data, output_path, affine):
+    # Convert data to double precision (float64)
+    data = data.astype(np.float64)
+    nib_img = nib.Nifti1Image(data, affine)
+    nib.save(nib_img, output_path)
+
+
+def extract_number(filename):
+    match = re.search(r'\d+', filename)
+    if match:
+        return match.group(0)
+    else:
+        return '0'
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Swin UNETR Inference Script")
+    parser.add_argument("--checkpoint", required=True, help="Path to the model checkpoint")
+    parser.add_argument("--data_dir", required=True, help="Dataset directory")
+    parser.add_argument("--json_list", required=True, help="Dataset json file")
+    parser.add_argument("--output_dir", required=True, help="Output directory for NIfTI files")
+    parser.add_argument("--roi_x", default=96, type=int, help="ROI size in x direction")
+    parser.add_argument("--roi_y", default=96, type=int, help="ROI size in y direction")
+    parser.add_argument("--roi_z", default=96, type=int, help="ROI size in z direction")
+    parser.add_argument("--in_channels", default=2, type=int, help="Number of input channels")
+    parser.add_argument("--out_channels", default=1, type=int, help="Number of output channels")
+    parser.add_argument("--feature_size", default=48, type=int, help="Feature size")
+    parser.add_argument("--dropout_path_rate", default=0.0, type=float, help="Drop path rate")
+    parser.add_argument("--use_checkpoint", action="store_true", help="Use gradient checkpointing to save memory")
+    parser.add_argument("--sw_batch_size", default=4, type=int, help="Number of sliding window batch size")
+    parser.add_argument("--infer_overlap", default=0.5, type=float, help="Sliding window inference overlap")
+
+    args = parser.parse_args()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = load_model(args.checkpoint, device, args)
+    val_loader = prepare_data(args.data_dir, args.json_list, (args.roi_x, args.roi_y, args.roi_z))
+
+    os.makedirs(args.output_dir, exist_ok=True)
 
     with torch.no_grad():
-        mse_list_case = []
-        for i, batch in enumerate(val_loader):
-            val_inputs, val_labels = (batch["image"].to(device), batch["label"].to(device))
-            original_affine = batch["label_meta_dict"]["affine"][0].numpy()
-            _, _, h, w, d = val_labels.shape
-            target_shape = (h, w, d)
-            img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
-            print("Inference on case {}".format(img_name))
-            val_outputs = sliding_window_inference(
-                val_inputs, (args.roi_x, args.roi_y, args.roi_z), 4, model, overlap=args.infer_overlap, mode="gaussian"
-            )
-            val_outputs = val_outputs.cpu().numpy()[0, 0]
-            val_labels = val_labels.cpu().numpy()[0, 0, :, :, :]
-            val_outputs = resample_3d(val_outputs, target_shape)
-            mse = np.mean((val_outputs - val_labels) ** 2)
-            mse_list_case.append(mse)
-            if args.save:
-                nib.save(
-                    nib.Nifti1Image(val_outputs.astype(np.float32), original_affine), os.path.join(output_directory, img_name)
+        for batch in val_loader:
+            images = batch["image"].to(device).double()  # Ensure the input images are in double precision
+            affines = batch["image_meta_dict"]["affine"]
+            filenames = batch["image_meta_dict"]["filename_or_obj"]
+            for idx, image in enumerate(images):
+                pred = sliding_window_inference(
+                    inputs=image.unsqueeze(0),
+                    roi_size=(args.roi_x, args.roi_y, args.roi_z),
+                    sw_batch_size=args.sw_batch_size,
+                    predictor=model,
+                    overlap=args.infer_overlap,
                 )
-        print("Overall Mean RMSE: {}".format(sqrt(np.mean(mse_list_case))))
+                pred = pred.squeeze().cpu().numpy()
+                number = extract_number(os.path.basename(filenames[idx]))
+                output_path = os.path.join(args.output_dir, f"ADRM{number}N.nii.gz")
+                save_nifti(pred, output_path, affines[idx])
+                print(f"Saved: {output_path}")
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-    args.save = True
     main()
